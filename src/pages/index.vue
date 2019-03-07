@@ -19,78 +19,78 @@
 
 <script>
     export default{
-		name: 'index',
-		data () {
-			return {
-				list : [
-					{
-						title : 'Chrome更新了' ,
-						imgUrl : './static/images/Chrome.png' ,
-						tips : '不再支持Flash视频播放' ,
-						time : '上午 8:30'
-					},
-					{
-						title : '电影新资讯' ,
-						imgUrl : './static/images/Sina.png' ,
-						tips : '电影《红海行动》上映以来票房暴涨，很多国人表示对国产电影有了新的改观' ,
-						time : '上午 12:00'
-					},
+        name: 'index',
+        data () {
+            return {
+                list : [
                     {
-						title : '聚焦两会·共筑中国梦' ,
-						imgUrl : './static/images/video.png' ,
-						tips : '习近平代表的两会故事' ,
-						time : '下午 17:45'
+                        title : 'Chrome更新了' ,
+                        imgUrl : './static/images/Chrome.png' ,
+                        tips : '不再支持Flash视频播放' ,
+                        time : '上午 8:30'
                     },
                     {
-						title : '微信团队' ,
-						imgUrl : './static/images/Wechat.png' ,
-						tips : '您的帐号有异常登录，如非本人操作，请及时修改密码' ,
-						time : '昨天'
+                        title : '电影新资讯' ,
+                        imgUrl : './static/images/Sina.png' ,
+                        tips : '电影《红海行动》上映以来票房暴涨，很多国人表示对国产电影有了新的改观' ,
+                        time : '上午 12:00'
+                    },
+                    {
+                        title : '聚焦两会·共筑中国梦' ,
+                        imgUrl : './static/images/video.png' ,
+                        tips : '习近平代表的两会故事' ,
+                        time : '下午 17:45'
+                    },
+                    {
+                        title : '微信团队' ,
+                        imgUrl : './static/images/Wechat.png' ,
+                        tips : '您的帐号有异常登录，如非本人操作，请及时修改密码' ,
+                        time : '昨天'
                     }
-				],
-				startX : 0,
-				endX : 0,
-                activeSwiper: -1, //当前活动的滑块
-			}
-		},
-		methods : {
-			//跳转
-			skip(){
-				if( this.checkSlide() ){
-					this.activeSwiper = -1;
+                ],
+                startX : 0,
+                endX : 0,
+                activeSwiper: -1, //当前活动的滑块， -1表示没有活动滑块
+            }
+        },
+        methods : {
+            //跳转
+            skip() {
+                if(this.checkSlide()){
+                    this.activeSwiper = -1;
                 }else{
-					alert('You click the slide!')
+                    alert('You click the slide!')
                 }
-			},
-			//滑动开始
-			touchStart(e){
-				this.startX = e.touches[0].clientX;
-			},
-			//滑动结束
-			touchEnd(e){
-				this.endX = e.changedTouches[0].clientX;
-				if(this.startX - this.endX > 30){
-					this.activeSwiper = e.currentTarget.dataset.index;
-				}
-
-				if(this.startX - this.endX < -30){
-					this.activeSwiper = -1;
-				}
-
-				this.startX = 0;
-				this.endX = 0;
-			},
-            //判断当前是否有滑块处于滑动状态
-            checkSlide(){
-				return this.activeSwiper > -1;
             },
-			//删除
-			deleteItem(e){
-				let index = e.currentTarget.dataset.index;
-				this.activeSwiper = -1;
-				this.list.splice(index,1);
-			}
-		}
+            //滑动开始
+            touchStart(e) {
+                this.startX = e.touches[0].clientX;
+            },
+            //滑动结束
+            touchEnd(e) {
+                this.endX = e.changedTouches[0].clientX;
+                if(this.startX - this.endX > 30){
+                    this.activeSwiper = e.currentTarget.dataset.index;
+                }
+
+                if(this.startX - this.endX < -30){
+                    this.activeSwiper = -1;
+                }
+
+                this.startX = 0;
+                this.endX = 0;
+            },
+            //判断当前是否有滑块处于滑动状态
+            checkSlide() {
+                return this.activeSwiper > -1;
+            },
+            //删除
+            deleteItem(e) {
+                let index = e.currentTarget.dataset.index;
+                this.activeSwiper = -1;
+                this.list.splice(index,1);
+            }
+        }
     }
 </script>
 
