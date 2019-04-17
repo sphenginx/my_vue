@@ -47,6 +47,7 @@ SVGIconOverlayPolygon.prototype.initialize = function(map) {
     this._div = div;
     this._cwidth = this._div.clientWidth;
     this._cheight = this._div.clientHeight;
+    return this._div;
 }
 
 //重写 draw 方法
