@@ -18,6 +18,7 @@
  
 //import textIconOverlay
 import SVGIconOverlay from './SVGIconOverlay.js';
+import EventWrapper from './EventWrapper.js';
 
  var getExtendedBounds = function(map, bounds, gridSize){
      bounds = cutBoundsInRange(bounds);
@@ -130,6 +131,8 @@ var MarkerClusterer =
         this._styles = opts["styles"] || [];
         //如果需要自定义文字，需要传入聚合图标自定义文字的方法
         this._textCallBack = opts['textCallBack'] || "";
+        //marker的点击事件回调
+        this._markerCallBack = opts['markerCallBack'] || "";
     
         var that = this;
         this._map.addEventListener("zoomend",function(){
@@ -192,7 +195,15 @@ MarkerClusterer.prototype._createClusters = function(){
         if(!marker.isInCluster && extendedBounds.containsPoint(marker.getPosition()) ){ 
             this._addToClosestCluster(marker);
         }
-    }   
+    }
+    
+    if (!this._clusters.length) {
+       return;
+    }
+
+    for (var i in this._clusters) {
+       this._clusters[i].render();
+    }
 };
 
 /**
@@ -365,6 +376,14 @@ MarkerClusterer.prototype.setTextCallBack = function(callBack) {
 };
 
 /**
+ * 获取maker的回调方法
+ * @return {function} maker的回调方法
+ */
+MarkerClusterer.prototype.getMarkerCallBack = function() {
+    return this._markerCallBack;
+};
+
+/**
  * 获取聚合的最大缩放级别。
  * @return {Number} 聚合的最大缩放级别。
  */
@@ -467,6 +486,7 @@ function Cluster(markerClusterer){
     this._minClusterSize = markerClusterer.getMinClusterSize();
     this._isAverageCenter = markerClusterer.isAverageCenter();
     this._textCallBack = markerClusterer.getTextCallBack();
+    this._markerCallBack = markerClusterer.getMarkerCallBack();
     this._center = null;//落脚位置
     this._markers = [];//这个Cluster中所包含的markers
     this._gridBounds = null;//以中心点为准，向四边扩大gridSize个像素的范围，也即网格范围
@@ -501,23 +521,36 @@ Cluster.prototype.addMarker = function(marker){
 
     marker.isInCluster = true;
     this._markers.push(marker);
-
-    var len = this._markers.length;
-    if(len < this._minClusterSize ){     
-        this._map.addOverlay(marker);
-        //this.updateClusterMarker();
-        return true;
-    } else if (len === this._minClusterSize) {
-        for (var i = 0; i < len; i++) {
-            this._markers[i].getMap() && this._map.removeOverlay(this._markers[i]);
-        }
-        
-    } 
-    this._map.addOverlay(this._clusterMarker);
-    this._isReal = true;
-    this.updateClusterMarker();
-    return true;
 };
+
+/**
+ * 进行dom操作
+ * @return 无返回值
+ */
+Cluster.prototype.render = function() {
+    var len = this._markers.length;
+    if (len < this._minClusterSize) {
+        for (var i = 0; i < len; i++) {
+            this._map.addOverlay(this._markers[i]);
+            //绑定marker的点击事件
+            this._bindMarkerCallBack(this._markers[i]);
+        }
+    } else {
+        this._map.addOverlay(this._clusterMarker);
+        this._isReal = true;
+        this.updateClusterMarker();
+    }
+ }
+
+/**
+ * 绑定marker的点击事件
+ * @return 无返回值
+ */
+Cluster.prototype._bindMarkerCallBack = function (marker) {
+    if (this._markerCallBack && typeof(this._markerCallBack) == 'function') {
+        this._markerCallBack(marker);
+    }
+}
 
 /**
  * 判断一个标记是否在该聚合中。
@@ -568,6 +601,8 @@ Cluster.prototype.updateClusterMarker = function () {
         this._clusterMarker && this._map.removeOverlay(this._clusterMarker);
         for (var i = 0, marker; marker = this._markers[i]; i++) {
             this._map.addOverlay(marker);
+            //绑定marker的点击事件
+            this._bindMarkerCallBack(this._markers[i]);
         }
         return;
     }
@@ -584,7 +619,7 @@ Cluster.prototype.updateClusterMarker = function () {
 
     var thatMap = this._map;
     var thatBounds = this.getBounds();
-    this._clusterMarker.addEventListener("click", function(event){
+    EventWrapper.addDomListener(this._clusterMarker._div, "touchend", function(event){
         thatMap.setViewport(thatBounds);
     });
 };
