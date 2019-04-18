@@ -135,13 +135,14 @@ var MarkerClusterer =
         this._markerCallBack = opts['markerCallBack'] || "";
     
         var that = this;
-        this._map.addEventListener("zoomend",function(){
+        this._zoomEndHandler = function(){
             that._redraw();
-        });
-
-        this._map.addEventListener("moveend",function(){
+        }
+        this._moveEndHandler = function(){
             that._redraw();
-        });
+        };
+        this._map.addEventListener("zoomend", this._zoomEndHandler);
+        this._map.addEventListener("moveend", this._moveEndHandler);
 
         var mkrs = opts["markers"];
         isArray(mkrs) && this.addMarkers(mkrs);
@@ -157,7 +158,7 @@ MarkerClusterer.prototype.addMarkers = function(markers){
     for(var i = 0, len = markers.length; i <len ; i++){
         this._pushMarkerTo(markers[i]);
     }
-    this._createClusters();   
+    this._createClusters();
 };
 
 /**
@@ -328,6 +329,9 @@ MarkerClusterer.prototype.removeMarkers = function(markers) {
 MarkerClusterer.prototype.clearMarkers = function() {
     this._clearLastClusters();
     this._removeMarkersFromMap();
+    //删除监听事件
+    this.removeEventListener('zoomend', this._zoomEndHandler);
+    this.removeEventListener('moveend', this._moveEndHandler);
     this._markers = [];
 };
 
@@ -527,7 +531,7 @@ Cluster.prototype.addMarker = function(marker){
  * 进行dom操作
  * @return 无返回值
  */
-Cluster.prototype.render = function() {
+Cluster.prototype.render = function(){
     var len = this._markers.length;
     if (len < this._minClusterSize) {
         for (var i = 0; i < len; i++) {
@@ -547,9 +551,9 @@ Cluster.prototype.render = function() {
  * @return 无返回值
  */
 Cluster.prototype._bindMarkerCallBack = function (marker) {
-    if (this._markerCallBack && typeof(this._markerCallBack) == 'function') {
-        this._markerCallBack(marker);
-    }
+   if (this._markerCallBack && typeof(this._markerCallBack) == 'function') {
+      this._markerCallBack(marker);
+   }
 }
 
 /**
@@ -602,7 +606,7 @@ Cluster.prototype.updateClusterMarker = function () {
         for (var i = 0, marker; marker = this._markers[i]; i++) {
             this._map.addOverlay(marker);
             //绑定marker的点击事件
-            this._bindMarkerCallBack(this._markers[i]);
+            this._bindMarkerCallBack(marker);
         }
         return;
     }
