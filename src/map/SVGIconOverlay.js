@@ -51,12 +51,8 @@ SVGIconOverlay.prototype.initialize = function(map) {
     return this._div;
 }
 
-//重写 draw 方法
 SVGIconOverlay.prototype.draw = function(){
-    var pixel = this._map.pointToOverlayPixel(this._point);
-    this._div.style.position = "absolute";
-    this._div.style.left = pixel.x - this._cwidth/2 + "px";
-    this._div.style.top  = pixel.y - this._cheight/2  + "px";
+    this._map && this._updatePosition();
 }
 
 SVGIconOverlay.prototype.getMap = function(){
@@ -75,12 +71,10 @@ SVGIconOverlay.prototype.setPosition = function (position) {
 
 SVGIconOverlay.prototype._updatePosition = function() {
     if (this._div && this._point) {
-        var style = this._div.style;
-        var pixelPosition = this._map.pointToOverlayPixel(this._point);
-        pixelPosition.x -= Math.ceil(parseInt(style.width) / 2);
-        pixelPosition.y -= Math.ceil(parseInt(style.height) / 2);
-        style.left = pixelPosition.x + "px";
-        style.top = pixelPosition.y + "px";
+        let pixel = this._map.pointToOverlayPixel(this._point);
+        this._div.style.position = "absolute";
+        this._div.style.left = pixel.x - Math.ceil(parseInt(this._cwidth) / 2) + "px";
+        this._div.style.top  = pixel.y - Math.ceil(parseInt(this._cheight)/ 2) + "px";
     }
 };
 
@@ -203,11 +197,23 @@ extend(SVGIconOverlay.prototype,
         var y = x + (lineHeight * 0.35) //35% was found experimentally 
         var circleText = this.options.circleText;
         var textColor = this.options.fontColor.replace("rgb(", "rgba(").replace(")", "," + this.options.fontOpacity + ")")
-        var _text = '<text text-anchor="middle" x="'+ x +'" y="'+y+'" style="font-size: '+fontSize+'" fill="'+textColor+'" pointer-events="none">'+circleText+'</text>';
+        var _text = "";
+        if (circleText instanceof Array) {
+            for(let i in circleText){
+                let _val = circleText[i];
+                y  += i * 15;
+                _text += '<text text-anchor="middle" x="'+ x +'" y="'+ y +'" style="font-size: '+fontSize+'" fill="'+textColor+'" pointer-events="none">'+_val+'</text>';
+            }
+        } else {
+            _text = '<text text-anchor="middle" x="'+ x +'" y="'+y+'" style="font-size: '+fontSize+'" fill="'+textColor+'" pointer-events="none">'+circleText+'</text>';
+        }
         return _text;
     },
     _updateText: function() {
         this.options.circleText = this._text;
+        if (this._div) {
+            this._div.innerHTML = this._createSVG();
+        }
     }
 }, true);
 

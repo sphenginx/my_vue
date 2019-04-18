@@ -31,9 +31,11 @@ function extend(o, n, override) {
     return o;
 }
 
-function SVGIconOverlayPolygon(point, txt, opts) {
+function SVGIconOverlayPolygon(point, txt, num, ha, opts) {
     this._point = point;
     this._text = txt;
+    this._num = num;
+    this._ha = ha;
     this.init(opts);
 } 
 
@@ -50,18 +52,19 @@ SVGIconOverlayPolygon.prototype.initialize = function(map) {
     return this._div;
 }
 
-//重写 draw 方法
-SVGIconOverlayPolygon.prototype.draw = function(){
-    var pixel = this._map.pointToOverlayPixel(this._point);
-    this._div.style.position = "absolute";
-    this._div.style.left = pixel.x - this._cwidth/2 + "px";
-    this._div.style.top  = pixel.y - this._cheight/2  + "px";
+SVGIconOverlayPolygon.prototype.draw = function() {
+    this._map && this._updatePosition();
 }
 
-SVGIconOverlayPolygon.prototype.getMap = function(){
+SVGIconOverlayPolygon.prototype.getMap = function() {
     return this._map;
 };
-SVGIconOverlayPolygon.prototype.getPosition = function(){
+
+SVGIconOverlayPolygon.prototype.getHa = function () {
+    return this._ha;
+}
+
+SVGIconOverlayPolygon.prototype.getPosition = function() {
     return this._point;
 };
 
@@ -74,12 +77,10 @@ SVGIconOverlayPolygon.prototype.setPosition = function (position) {
 
 SVGIconOverlayPolygon.prototype._updatePosition = function() {
     if (this._div && this._point) {
-        var style = this._div.style;
-        var pixelPosition = this._map.pointToOverlayPixel(this._point);
-        pixelPosition.x -= Math.ceil(parseInt(style.width) / 2);
-        pixelPosition.y -= Math.ceil(parseInt(style.height) / 2);
-        style.left = pixelPosition.x + "px";
-        style.top = pixelPosition.y + "px";
+        let pixel = this._map.pointToOverlayPixel(this._point);
+        this._div.style.position = "absolute";
+        this._div.style.left = pixel.x - Math.ceil(parseInt(this._cwidth) / 2) + "px";
+        this._div.style.top  = pixel.y - Math.ceil(parseInt(this._cheight)/ 2) + "px";
     }
 };
 
@@ -92,6 +93,16 @@ SVGIconOverlayPolygon.prototype.setText = function(text) {
         this._text = text;
         this._updateText();
         this._updatePosition(); 
+    }
+};
+
+SVGIconOverlayPolygon.prototype.getNum = function(){
+    return this._num;  
+};
+
+SVGIconOverlayPolygon.prototype.setNum = function(num) {
+    if(num && (!this._num || (this._num!= num))){
+        this._num = num;
     }
 };
 
@@ -194,7 +205,7 @@ extend(SVGIconOverlayPolygon.prototype,
         var fontSize = this.options.fontSize + "px"
         var lineHeight = Number(this.options.fontSize)
         var x = Number(this.options.iconSize.x) / 2
-        var y = x + (lineHeight * 0.35) //35% was found experimentally 
+        var y = this.options.rectSize.y - this.options.circleWeight - lineHeight;
         var polygonText = this.options.polygonText;
         var textColor = this.options.fontColor.replace("rgb(", "rgba(").replace(")", "," + this.options.fontOpacity + ")")
         var _text = '<text text-anchor="middle" x="'+ x +'" y="'+y+'" style="font-size: '+fontSize+'" fill="'+textColor+'" pointer-events="none">'+polygonText+'</text>';
@@ -215,6 +226,9 @@ extend(SVGIconOverlayPolygon.prototype,
     },
     _updateText: function() {
         this.options.polygonText = this._text;
+        if (this._div) {
+            this._div.innerHTML = this._createSVG();
+        }
     }
 }, true);
 
