@@ -152,6 +152,11 @@ extend(SVGIconOverlay.prototype,
             options.radius = options.iconSize.x/2 * Number(options.circleRatio)
         }
 
+        if (!options.idName) {
+            var _timer = new Date();
+            options.idName = _timer.getTime() + "" + _timer.getMilliseconds();
+        }
+
         this.options = options;
     },
     _createCircle: function() {

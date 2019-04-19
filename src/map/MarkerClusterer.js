@@ -330,8 +330,8 @@ MarkerClusterer.prototype.clearMarkers = function() {
     this._clearLastClusters();
     this._removeMarkersFromMap();
     //删除监听事件
-    this.removeEventListener('zoomend', this._zoomEndHandler);
-    this.removeEventListener('moveend', this._moveEndHandler);
+    this._map.removeEventListener('zoomend', this._zoomEndHandler);
+    this._map.removeEventListener('moveend', this._moveEndHandler);
     this._markers = [];
 };
 
