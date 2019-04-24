@@ -32,9 +32,13 @@ function ComplexCustomOverlay(opts){
         _eventCallBack: function () {
             //元素的回调方法（渲染到地图上时才可调用）：点击、等 用 EventWrapper
             //可以用 this 获取 该复杂覆盖物本身，call的时候上下文的作用域变成了复杂覆盖物自己
-            EventWrapper.addDomListener(this._div, "touchend", function(e){
-                console.log(this._setting);
-                console.log(this.getOption('_point'));
+            //这里把 this 赋给 me
+            let me = this;
+            EventWrapper.addDomListener(this._div, "touchend", function() {
+                //这里 me 是 复杂覆盖物本身
+                console.log(me);
+                //注意： 这里this 指的是 div，不是复杂覆盖物
+                console.log(this);
             });
         }
     };
