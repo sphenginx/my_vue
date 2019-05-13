@@ -1,6 +1,9 @@
 // 引入复杂覆盖物监听插件
 import EventWrapper from './EventWrapper.js';
 
+//引入自定义覆盖物的css
+import "./ComplexCustomOverlay.css";
+
 //合并参数
 function extend(o, n, override) {
     for(let key in n){
@@ -50,7 +53,7 @@ ComplexCustomOverlay.prototype.initialize = function(map){
     this._dom = '';
     if (this._setting['_initalizeCallBack'] && typeof(this._setting['_initalizeCallBack']) == 'function') {
         this._dom = this._setting['_initalizeCallBack'].call(this);
-        this._map.getPanes().labelPane.appendChild(div);
+        this._map.getPanes().labelPane.appendChild(this._dom);
     }
     this._cwidth = this._dom.clientWidth;
     this._cheight = this._dom.clientHeight;
