@@ -4,6 +4,9 @@ import EventWrapper from './EventWrapper.js';
 //引入自定义覆盖物的css
 import "./ComplexCustomOverlay.css";
 
+// require node package util
+let util = require('util');
+
 //合并参数
 function extend(o, n, override) {
     for(let key in n){
@@ -51,13 +54,13 @@ ComplexCustomOverlay.prototype = new BMap.Overlay();
 ComplexCustomOverlay.prototype.initialize = function(map){
     this._map = map;
     this._dom = '';
-    if (this._setting['_initalizeCallBack'] && typeof(this._setting['_initalizeCallBack']) == 'function') {
+    if (util.isFunction(this._setting['_initalizeCallBack'])) {
         this._dom = this._setting['_initalizeCallBack'].call(this);
         this._map.getPanes().labelPane.appendChild(this._dom);
     }
     this._cwidth = this._dom.clientWidth;
     this._cheight = this._dom.clientHeight;
-    if (this._setting['_eventCallBack'] && typeof(this._setting['_eventCallBack']) == 'function') {
+    if (util.isFunction(this._setting['_eventCallBack'])) {
         this._setting['_eventCallBack'].call(this);
     }
     //这里必须有返回值，map.clearOverlays 会操作 dom 元素
@@ -92,5 +95,5 @@ ComplexCustomOverlay.prototype.getOption = function(key) {
     return this._setting[key];
 }
 
-//最后将插件对象暴露给全局对象
+//export ComplexCustomOverlay
 export default ComplexCustomOverlay;
