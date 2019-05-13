@@ -5,7 +5,6 @@
 </template>
 <script>
     import BaiduMap from './baidu_Map.js';
-    import coreMap from './coreMap.js';
     export default {
         name: 'MapAsset',
         data () {
@@ -16,11 +15,13 @@
         mounted: function () {
             let me = this;
             BaiduMap.init().then(() => {
-                me.init(); //渲染地图
+                import('./coreMap.js').then(
+                    (coreMap) => me.init(coreMap.default)
+                );
             });
         },
         methods: {
-            init: function () {
+            init: function (coreMap) {
                 let opt = {
                     mapControl: [
                         {
