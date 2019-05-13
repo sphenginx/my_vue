@@ -27,6 +27,7 @@
 import SVGIconOverlay  from './SVGIconOverlay.js';
 import MarkerClusterer from './MarkerClusterer.js';
 import SVGIconOverlayPolygon from './SVGIconOverlayPolygon.js';
+import EventWrapper from './EventWrapper.js';
 
 
 "use strict";
@@ -196,14 +197,13 @@ coreMap.prototype = {
                 icon_width = 48;
             }
             let distOverlay = self._getSVGIconOverlayCircle(_dist.distCode, radius, color, icon_width, _dist.distName, _latlng);
+            self._map.addOverlay(distOverlay);
             //点击行政区气泡
-            distOverlay.addEventListener("click", function(){
+            EventWrapper.addDomListener(distOverlay._div, 'touchend', function(){
                 self._clusterParam.district = _dist.distCode;
                 self._dist = _dist.distCode;
                 self._zoomPan(11, _latlng);
             });
-
-            self._map.addOverlay(distOverlay);
         }
     },
     //获取 SVGIcon 圆形覆盖物

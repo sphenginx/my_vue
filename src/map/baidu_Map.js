@@ -7,13 +7,13 @@ export default {
         return new Promise((resolve, reject) => {
             // 如果已加载直接返回
             if(typeof BMap !== "undefined") {
-                resolve();
+                resolve(BMap);
                 return true;
             }
             // 百度地图异步加载回调处理
-            window.onBMapCallback = function () {
+            window.onBMapCallback = function (BMap) {
                 // console.log("百度地图脚本初始化成功...");
-                resolve();
+                resolve(BMap);
             };
             me.loadScript(BMap_URL);
         });
