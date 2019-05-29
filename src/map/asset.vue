@@ -13,15 +13,12 @@
             }
         },
         mounted: function () {
-            let me = this;
-            BaiduMap.init().then(() => {
-                import('./coreMap.js').then(
-                    (coreMap) => me.init(coreMap.default)
-                );
-            });
+            this.init();
         },
         methods: {
-            init: function (coreMap) {
+            async init () {
+                await BaiduMap.init();
+                const {default: coreMap} = await import('./coreMap.js');
                 let opt = {
                     mapControl: [
                         {
