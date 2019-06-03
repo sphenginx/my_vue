@@ -1,0 +1,80 @@
+/*自定义覆盖物样式*/
+.map-ha-popbox {
+    background: #ff6d00;
+    color: #fff;
+    height: 30px;
+    line-height: 30px;
+    font-size: 0.35rem;
+    padding: 0 20px;
+    border-radius: 15px;
+    position: relative;
+    opacity: 0.9;
+    clear: both;
+    display: inline-block;
+    white-space: nowrap;
+    _zoom: 1;
+    cursor: pointer;
+}
+
+.map-ha-popbox i {
+    background: url(/static/img/2019/map_pt.png) no-repeat;
+    position: absolute;
+    left: 50%;
+    margin-left: -7px;
+    display: block;
+    height: 8px;
+    width: 15px;
+}
+
+.map-ha-popbox.on {
+    background: #ff4309;
+    z-index: 1;
+}
+
+.map-ha-popbox.on i {
+    background: url(/static/img/2019/map_pt_h.png) no-repeat;
+}
+
+/*polygon 覆盖物样式*/
+.map-polygonbox {
+    background: #ff4848;
+    color: #fff;
+    height: 30px;
+    line-height: 30px;
+    font-size: 0.35rem;
+    padding: 0 20px;
+    border-radius: 15px;
+    position: relative;
+    opacity: 0.9;
+    clear: both;
+    display: inline-block;
+    white-space: nowrap;
+    _zoom: 1;
+    cursor: pointer;
+}
+
+.map-polygonbox i {
+    position: absolute;
+    left: 50%;
+    margin-top: 30px;
+    margin-left: -7px;
+    border-color: #ff4848 transparent transparent transparent;
+    border-style: solid;
+    border-width: 8px 7px 0 7px;
+    height: 0;
+    width: 0;
+    overflow: hidden;
+}
+
+/*circle 覆盖物样式*/
+.map-circlebox {
+    color: #fff;
+    font-size: 0.36rem;
+    text-align: center;
+    border-radius: 50%;
+    opacity: 0.9;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
