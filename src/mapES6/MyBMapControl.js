@@ -34,7 +34,6 @@ class MyGeoLocationControl extends BMap.GeolocationControl {
         this._checkEventListener();
         return this._dom;
     }
-
     // 定位图片换成自己的
     _draw () {
         if (this._dom) {
@@ -47,7 +46,6 @@ class MyGeoLocationControl extends BMap.GeolocationControl {
             geolocationIconDom.style['background-image'] = "url('/static/img/2019/map_location.png')";
         }
     }
-
     // 在locationSuccess 或者 locationError 事件之后， 需要调用 _draw 方法。 
     // 否则 定位控件的图标会还原成 百度地图默认的图标
     _checkEventListener () {
@@ -57,21 +55,18 @@ class MyGeoLocationControl extends BMap.GeolocationControl {
                 this._setting['locationSuccess'](e);
             });
         }
-
         // 监听定位失败事件
         if (typeof this._setting['locationError'] == 'function') {
             this.addEventListener('locationError', e => {
                 this._setting['locationError'](e);
             });
         }
-
         // fixed: 百度地图蛇精病， 会把定位控件的图标换成自己的， 这里再换回来！
         this._map.addEventListener('tilesloaded', () => {
             this._draw();
         })
     }
 }
-
 // 我的比例尺组件
 class MyScaleControl extends BMap.ScaleControl {
     initialize (map) {
@@ -83,5 +78,4 @@ class MyScaleControl extends BMap.ScaleControl {
         return this._dom;
     }
 }
-
 export {MyGeoLocationControl, MyScaleControl};
