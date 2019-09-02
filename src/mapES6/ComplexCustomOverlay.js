@@ -9,7 +9,7 @@ function extend(o, n, override) {
 }
 
 //复杂覆盖物实例，继承自百度 overlay
-class ComplexCustomOverlay extends BMap.Overlay {
+export class ComplexCustomOverlay extends BMap.Overlay {
     constructor (opts) {
         super();
         let def = {
@@ -59,8 +59,9 @@ class ComplexCustomOverlay extends BMap.Overlay {
     _updatePosition () {
         if (this._div && this.getOption('_point')) {
             let pixel = this._map.pointToOverlayPixel(this.getOption('_point'));
+            let iObj = this._div.getElementsByTagName('i')[0];
             this._div.style.left = pixel.x - this._cwidth/2 + "px";
-            this._div.style.top  = pixel.y - this._cheight - 10 + "px";
+            this._div.style.top  = pixel.y - this._cheight - iObj.offsetHeight + "px";
         }
     }
     getPosition () {
@@ -76,6 +77,3 @@ class ComplexCustomOverlay extends BMap.Overlay {
         return this._setting[key];
     }
 }
-
-//最后将插件对象暴露给全局对象
-export default ComplexCustomOverlay;

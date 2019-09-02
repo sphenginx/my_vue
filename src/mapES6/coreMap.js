@@ -24,7 +24,7 @@
  **************************************************************
  */
 //引入自定义icon及text覆盖物、 聚合js
-import {MyGeoLocationControl, MyScaleControl} from './MyBMapControl.js';
+import * as coreMapMode from './coreMapMode.js'
 import {SVGIconOverlay, SVGIconOverlayPolygon}  from './SVGIconOverlay.js';
 import MarkerClusterer from './MarkerClusterer.js';
 import EventWrapper from './EventWrapper.js';
@@ -40,42 +40,44 @@ function extend(o, n, override) {
 }
 
 // 地图核心类
-class coreMap {
+export class coreMap {
     constructor (opt) {
         //气泡颜色列表
         this.bubbleColorScope = [
             '#f17881', '#dd4f51','#ff4848',
             '#d12020', '#9d1212',
         ];
-
         //气泡大小列表
         this.bubbleSizeScope = [24, 26, 28, 30, 32];
+        //自适应zoom
+        this._adaptateZoom = true;
 
-        this.bubbleAjaxHandle = null;
-        this.clusterAjaxHandle = null;
-        this.haAjaxHandle = null;
         this._haData = {}; //小区数据
         this._centerPoint = []; //中心点信息
-        this._centerMarker = null;
 
         //加载更多小区的移动距离
         this._loadMoreHaDistance = 500;
         // 聚合图标填充色
         this._clusterFillColor = '#ff4848';
         // 点击小区之后的颜色
-        this._haClickedColor = '#009688';
+        this._haClickedColor = '#ff7700';
 
+        // 显示行政区的 zoom 区间
         this.levelDistrictMin = 9;
         this.levelDistrictMax = 14;
+        // 显示小区的 zoom 区间
         this.levelHaMin = 15;
         this.levelHaMax = 19;
 
         this._map = null;
         this._mapData = null;
+        this._mode = null; //运行模式
         this._distParams = {};   //行政区参数
+        this._distOverlay = [];      // 聚合的行政区信息
         this._clusterParam = {}; //小区列表参数
+        this._cluster = null;    // 百度地图聚合对象
+        this._clusterHandler = null; //axios 请求句柄
         this._haParam = {};      //小区房源参数
-        this._haClickedMarker = null; //点击的小区图标
 
         this._moveStartPoint = null; //移动开始坐标点
         this._moveEndPoint = null; //移动结束坐标点
@@ -84,18 +86,12 @@ class coreMap {
         this._moveEndHandler = null;
         this._zoomEndHandler = null;
 
+        // 各种标识
         this._sigGetHaCallBack = false; //回调标识
         this._sigZoomPan = false; //zoom 和 移动标识
-        this._sigGeoLocation = false; //定位标识
-        this._sigHaClick = false; //是否点击了小区图标
         this._sigDistrictClick = false; //是否点击了行政区
         this._sigNotNeedLoadMoveEvent = false; //是否需要重新渲染moveend 事件
-        //自适应zoom
-        this._adaptateZoom = true;
 
-        this._cluster = null;
-
-        this._dist = '';
         this._defaultZoom = 12; //默认展示级别
         this._distClickZoom = 17; //点击行政区 跳转到 1：100 米的比例尺
         this._distColors = {};
@@ -105,101 +101,43 @@ class coreMap {
         // 默认参数
         let def = {
             mapId: "allmap", //地图Id
-            mode: "trade", // trade: 房屋置换、二手房、租房 |  ha：楼盘小区模式
             mapOpts: {
                 minZoom: 9, //最小9： 1:25公里
                 maxZoom: 19, //最大19：1:20米
             }, //地图初始化选项
-            mapControl: [], //地图控件
-            cityCode: "", //城市信息
             gps: "", //gps
-            toast: "", //提示框
-            api: {
-                distUrl: "/api/deal/distSearch",
-                haListUrl: "/api/deal/haSearch",
-                haHouseUrl: "/api/deal/search",
-            },
             params: "", //参数信息
-            getHaCallBack: "", //获取小区及房源回调函数
-            removeHaCallBack: "", //删除小区及房源回调函数
         };
         this._setting = extend(def, opt, true); //配置参数
-        this._initMapParams();
+        this._initMode();
         this._initMap();
-        this.addMapControl();
         this.renderCover();
     }
-    _initMapParams () {
-        //小区 ajax 参数信息
-        this._clusterParam = {...this._setting.params};
-        //行政区 地图 ajax 参数信息
-        this._distParams = {...this._setting.params};
-        //获取房源 ajax 参数信息
-        this._haParam = {...this._setting.params};
-        this._haParam['pageSize'] = 10; //默认展示10条
-        // 构建行政区的额外参数
-        this._distParams['pageSize'] = 50; // 要获取所有行政区的数据，这里传 50
-        this._distParams['propType'] = 11; // 只查楼盘小区类型的
-        let opt = {
-            // district: '',
-            gps: this._setting.gps,
-            lng: '',
-            lat: '',
-            coordType: "bd09ll",
-            distance: 1000
-        };
+    // 初始化运行模式信息
+    _initMode () {
+        const mode = coreMapMode[`${this._setting.vue.mode}Mode`];
+        if(!mode) {
+            this.toast('mode参数错误！');
+            throw new Error('mode参数错误！');
+        }
+        this._mode = new mode(this);
     }
-    //初始化地图信息
+    // 初始化地图信息
     _initMap () {
         this._map = new BMap.Map(this._setting.mapId, this._setting.mapOpts);
-        let _centerPointArr =  this._setting.gps.split(',');
-        this._centerPoint = new BMap.Point(_centerPointArr[0], _centerPointArr[1]);
+        let [lng, lat] =  this._setting.gps.split(',');
+        this._centerPoint = new BMap.Point(lng, lat);
         this._map.centerAndZoom(this._centerPoint, this._defaultZoom);
     }
-    //添加地图控件
-    addMapControl () {
-        if (!this._setting.mapControl.length) {
+    // 添加地图控件
+    addMapControl (mapControl) {
+        if (!mapControl.length) {
             return;
         }
-        let me = this;
-        for (let {ctrlClass, opt} of this._setting.mapControl) {
+        for (let {ctrlClass, opt} of mapControl) {
             let _controlObj = new ctrlClass(opt);
             this._map.addControl(_controlObj);
         }
-    }
-    //初始化中心坐标 Symbol icon
-    renderCenter () {
-        let point = this._centerPoint;
-        if (!point['lat'] || !point['lng']) {
-            return false;
-        }
-
-        //为了防止多个marker同时出现，先移除之前的marker
-        if (this._centerMarker) {
-            this._map.removeOverlay(this._centerMarker);
-        }
-
-        $($('.BMap_Marker').find('img')).each(function(){
-            if ($(this).attr('src').indexOf('geolocation') > -1) {
-                $(this).closest('.BMap_Marker').remove();
-            }
-        });
-
-        let me = this;
-        let _icon = new BMap.Symbol(BMap_Symbol_SHAPE_CIRCLE, {
-            scale: 10,
-            fillColor: "#0a7fff",
-            fillOpacity: 1,
-            strokeColor: "#0a7fff",
-            strokeOpacity: 0.2,
-            strokeWeight: 40,
-        });
-
-        me._centerMarker = new BMap.Marker(point, {icon: _icon});
-        me._map.addOverlay(me._centerMarker);
-        me._centerMarker.addEventListener('click', () => {
-            me.toast('我的位置');
-        });
     }
     //创建气泡
     createBubble () {
@@ -209,47 +147,32 @@ class coreMap {
             self._renderBubble(data);
         });
     }
-
     //获取气泡数据
     _getBubbleData (callback) {
         let self = this;
-        if (self.bubbleAjaxHandle) {
-            self._hideLoading();
-            self.bubbleAjaxHandle.abort();
-        }
-        self._showLoading();
-        // let saleOrLeaseArr = {1: "forsale", 2: "lease"};
-        if (!self._distParams['saleOrLease']) {
-            self._distParams['saleOrLease'] = "forsale"; //saleOrLeaseArr[self._distParams.flag];
-        }
-        self.bubbleAjaxHandle = $.ajax({
-            url: self._setting.api.distUrl,
-            data: self._distParams,
-            dataType: 'json',
-            success: function(data) {
-                // console.log(data);
-                self._hideLoading();
-                if (data.status == 200) {
-                    if (!data.data.totalSize) {
-                        self.toast("根据条件未获取到行政区数据！");
-                        return false;
-                    }
-                    callback.call(self, data.data);
-                } else {
-                    self.toast(data.errmsg);
+        this._setting.vue.axios.get(this._setting.api.distUrl, {
+            params: self._distParams,
+            CSFCLoading: true,
+            nolazyloading: true,
+            withCredentials:true,
+        }).then(({status, data}) => {
+            if (status == 200 && data.status == 200) {
+                let distData = self._mode.resultDistHandler(data.data);
+                if (!distData.valid) {
+                    self.toast("根据条件未获取到行政区数据！");
+                    return false;
                 }
-            },
-            complete: function() {
-                self._hideLoading();
-                self.bubbleAjaxHandle = null;
+                callback.call(self, distData);
+            } else {
+                self.toast(data.errmsg);
             }
         })
     }
-
     //渲染气泡
     _renderBubble (data) {
         let self = this;
         let _points = [];
+        self._distOverlay = [];
         for (let _dist of data.items) {
             //没有坐标进行下次轮询
             if (!_dist['gpsbd']) {
@@ -257,33 +180,22 @@ class coreMap {
             }
             let radius = 24;
             let color  = '#e4e4e4';
-            if (parseInt(_dist.price)) {
+            let priceKey = self._mode.distPriceKey;
+            if (_dist[priceKey]) {
                 radius = self._getBubbleSize('cnt', _dist);
-                color = self._getBubbleColor('price', _dist);
+                color = self._getBubbleColor(priceKey, _dist);
             }
             self._distColors[_dist.distCode] = color;
-            let _text = _dist.distName;
-            let _latlngArr = _dist['gpsbd'].split(',');
-            let _latlng = new BMap.Point(_latlngArr[1], _latlngArr[0]);
+            const [lat, lng] = _dist['gpsbd'].split(',');
+            const _latlng = new BMap.Point(lng, lat);
             //组合坐标信息
             _points.push(_latlng);
-            let distOverlay = self._getSVGIconOverlayCircle(radius * 2, color, _dist.distName, _latlng);
+            let distOverlay = self._getSVGIconOverlayCircle(radius, color, _dist.distName, _latlng);
             self._map.addOverlay(distOverlay);
+            self._distOverlay.push({_dist, _latlng});
             //绑定行政区气泡的点击事件
             EventWrapper.addDomListener(distOverlay._div, "touchend", () => {
-                // 点击行政区时暂时 去掉 district 参数
-                self._sigDistrictClick = true;
-                self._clusterParam['district'] = _dist.distCode;
-                //改善型置换，需要跳转至该行政区评分最高的小区
-                if (self._setting.params['flag'] == 1) {
-                    self._clusterParam['orderBy'] = 1;
-                }
-                //套利型置换, 需要跳转至该行政区平均单价最低的小区
-                if (self._setting.params['flag'] == 2) {
-                    self._clusterParam['orderBy'] = 3;
-                }
-                self._dist = _dist.distCode;
-                self._zoomPan(self._distClickZoom, _latlng);
+                self._mode.distClick(_dist, _latlng);
             });
         }
         //是否自适应缩放级别
@@ -291,6 +203,20 @@ class coreMap {
             self._adaptateZoom = false;
             self.adaptateZoom(_points);
         }
+
+        // 检测是否有小区信息
+        self._mode.checkHaParams();
+    }
+    //获取 SVGIcon 圆形覆盖物
+    _getSVGIconOverlayCircle (radius, color, text, latlng) {
+        let diameter = radius * 2; // 宽高需要是直径
+        let iconOptions = {
+            'background': color,
+            'width': `${diameter}px`,
+            'height': `${diameter}px`,
+            'opacity': 1,
+        };
+        return new SVGIconOverlay(latlng, text, iconOptions);
     }
     //自适应缩放级别 及 中心点
     adaptateZoom (points) {  
@@ -299,7 +225,6 @@ class coreMap {
         let minLng = points[0].lng;
         let maxLat = points[0].lat;
         let minLat = points[0].lat;
-        let res;
         for (let res of points) {
             if(res.lng > maxLng) maxLng = res.lng;
             if(res.lng < minLng) minLng = res.lng;
@@ -311,8 +236,7 @@ class coreMap {
         let zoom = this.getZoom(maxLng, minLng, maxLat, minLat);
         this._temporaryRemoveMapEventListener();
         this._map.centerAndZoom(new BMap.Point(cenLng, cenLat), zoom);
-        this.onZoom();
-        this.onMove();
+        this.run();
     }
     //根据经纬极值计算绽放级别。  
     getZoom (maxLng, minLng, maxLat, minLat) {  
@@ -331,88 +255,65 @@ class coreMap {
     //创建聚合
     createCluster () {
         let self = this;
-        if (self.clusterAjaxHandle) {
-            self._hideLoading();
-            self.clusterAjaxHandle.abort();
+        if (self._clusterHandler) {
+            self._clusterHandler.cancel('cancel repeat request');
         }
-        self._showLoading();
-        self._checkClusterParam();
+        // 检测小区参数信息
+        self._mode.buildClusterParams();
+        const cancelToken = self._setting.vue.axios.CancelToken;
+        const source = cancelToken.source();
+        self._clusterHandler = source;
         //获取小区数据
-        self.clusterAjaxHandle = $.ajax({
-            url: self._setting.api.haListUrl,
-            data:self._clusterParam,
-            dataType:'json',
-            success: function(data) {
-                self._hideLoading();
-                if (data.status == 200) {
-                    if (!data.data.totalSize) {
-                        // self.toast("暂未获取到该位置附近小区信息!");
-                        return false;
-                    }
-                    self._createClusters(data.data);
-                    self._checkSigDistrictClick(data.data);
-                } else {
-                    self.toast(data.errmsg);
+        self._setting.vue.axios.get(self._setting.api.haListUrl, {
+            cancelToken: source.token,
+            params: self._clusterParam,
+            CSFCLoading: true,
+            nolazyloading: true,
+            withCredentials:true,
+        }).then(({status, data}) => {
+            if (status == 200 && data.status == 200) {
+                if (!data.data.totalSize) {
+                    // self.toast("暂未获取到该位置附近小区信息!");
+                    return false;
                 }
-            },
-            complete: function() {
-                self._hideLoading();
-                self.clusterAjaxHandle = null;
+                self._createClusters(data.data);
+                self._checkSigDistrictClick(data.data);
+            } else {
+                self.toast(data.errmsg);
             }
         })
-    }
-    // 检测小区搜索参数信息
-    _checkClusterParam () {
-        let self = this;
-        //如果不是点击行政区加载小区列表，那么不传行政区 及 排序参数
-        if (!self._sigDistrictClick) {
-            delete self._clusterParam['district'];
-            delete self._clusterParam['orderBy'];
-            self._clusterParam['distance'] = 1000;
-        } else {
-            delete self._clusterParam['gps'];
-            delete self._clusterParam['lng'];
-            delete self._clusterParam['lat'];
-            delete self._clusterParam['distance'];
-        }
+        .catch(err => console.log(err))
+        .finally(() => self._clusterHandler = null);
     }
     //检测是否是行政区点击进来的！
     _checkSigDistrictClick (data) {
-        let self = this;
-        if (!self._sigDistrictClick) {
+        if (!this._sigDistrictClick) {
             return;
         }
-
         // 点击行政区标识 设为 false
-        self._sigDistrictClick = false;
+        this._sigDistrictClick = false;
 
-        let latlng = data.orderByFirstGps;
-        if (!latlng) {
+        let [lng, lat] = this._mode.filterFirstGps(data.orderByFirstGps);
+        if (!lng || !lat) {
             return;
         }
-
-        let _arr = latlng.split(',');
-        let _position = new BMap.Point(_arr[1], _arr[0]);
+        let position = new BMap.Point(lng, lat);
         // 行政区标识设为true，不重新加载地图移动的事件
-        self._sigNotNeedLoadMoveEvent = true;
-        self._map.panTo(_position);
+        this._sigNotNeedLoadMoveEvent = true;
+        this._map.panTo(position);
     }
     _createClusters (data) {
         let self = this;
         let markers = [];
-        for (let _ha of data.items) {
-            // 没有价格则不显示该小区
-            if (!_ha.price) {
-                continue;
-            }
-            let haOverlay = self._getSVGIconOverlayPolygon(_ha);
+        for (let ha of data.items) {
+            let haOverlay = self._getSVGIconOverlayPolygon(ha);
             markers.push(haOverlay);
         }
 
         // 构造百度地图聚合的参数
         let opts = {
             coreMap: self,
-            textCallBack: self._getClusterTextCallBack,
+            textCallBack: self._mode._getClusterTextCallBack,
             markerCallBack: self._getMarkerCallBack,
             markers: markers,
             styles: {'background': self._clusterFillColor}
@@ -424,90 +325,28 @@ class coreMap {
         self._cluster.addMarkers(markers);
         return true;
     }
-    //根据缩放级别获取 减去的经纬度信息
-    _getMiuteLat () {
-        let self = this;
-        let _zoom = self._map.getZoom();
-        let _zoomObj = {
-            15: 0.01, //1:500的比例尺，纬度大概减去0.01就会在地图上一半的中间了
-            16: 0.005, //1:200的比例尺，纬度大概减去0.005就会在地图上一半的中间了
-            17: 0.003, //1:100的比例尺，纬度大概减去0.003就会在地图上一半的中间了
-            18: 0.0015, //1:50的比例尺，纬度大概减去0.0015就会在地图上一半的中间了
-            19: 0.0008, //1:20的比例尺，纬度大概减去0.0008就会在地图上一半的中间了
-        };
-        return _zoomObj[_zoom];
-    }
-    // 获取 Text 的回调方法
-    _getClusterTextCallBack (markers) {
-        let self = this._coreMap;
-        let _haNum = markers.length;
-        // 新楼盘地图找房
-        if (self._setting.mode == 'ha') {
-            return  `${_haNum}个小区`;
-        }
-
-        // 房屋置换、二手房、租房
-        let _houseNum = 0;
-        if (['trade', 'forsale', 'lease'].includes(self._setting.mode)) {
-            for(let marker of markers) {
-                _houseNum += marker.getNum();
-            }
-            return `<span style="margin-top: 4px;display: block;">${_haNum}个小区<br>${_houseNum}套</span>`;
-        }
-        return '';
+    //获取 SVGIcon 多边形覆盖物
+    _getSVGIconOverlayPolygon (ha) {
+        ha = this._mode.filterHa(ha);
+        let ha_name = ha.haName;
+        let house_num = ha.cnt ? parseInt(ha.cnt) : 0;
+        let price = this._mode._getHaPrice(ha);
+        let text = this._mode._getMarkerText(ha_name, house_num, price);
+        let {lng, lat} = this._mode._getPoint(ha);
+        // 必须 是 BMap.Point， 否则聚合时会聚合不到一起
+        let latlng = new BMap.Point(lng, lat);
+        return new SVGIconOverlayPolygon(latlng, text, house_num, ha);
     }
     // 复杂覆盖物的点击事件
     _getMarkerCallBack (marker) {
         let self = this._coreMap;
-        // 房屋置换、二手房、租房
-        if (['trade', 'forsale', 'lease'].includes(self._setting.mode)) {
-            EventWrapper.addDomListener(marker._div, 'touchend', function() {
-                let currentHa = marker.getHa();
-                if (self._haClickedMarker) {
-                    let clickedHa = self._haClickedMarker.getHa();
-                    if (clickedHa['haCode'] == currentHa['haCode']) {
-                        return true;
-                    }
-                }
-                //更新marker的填充颜色
-                marker.setBackGround(self._haClickedColor);
-                // self._sigHaClick = true;
-                let _latlng = {...marker.getPosition()}
-                // 产品需求： 小区气泡位于除列表外，地图页面的中央 ！！！
-                _latlng['lat'] -= self._getMiuteLat();
-                let _position = new BMap.Point(_latlng.lng, _latlng.lat);
-                self._map.panTo(_position);
-                //此时不触发 地图移动超过 500米 加载更多小区的事件
-                self._sigNotNeedLoadMoveEvent = true;
-                //如果有小区图标变了颜色，则把前置的小区图标的颜色回归正常
-                self._checkPrevHaMarker();
-                // 当前小区变为 前置小区
-                self._haClickedMarker = marker;
-                // 获取小区房源列表
-                self.getHaDetail(currentHa);
-            });
-            return true;
-        }
-
-        // 新楼盘地图找房
-        if (self._setting.mode == 'ha') {
-            EventWrapper.addDomListener(marker._div, 'touchend', () => {
-                let currentHa = marker.getHa();
-                if (typeof self._setting.haMarkerClickCallBack == 'function') {
-                    self._setting.haMarkerClickCallBack(currentHa['haCode']);
-                }
-            });
-            return true;
-        }
+        EventWrapper.addDomListener(marker._div, 'touchend', () => {
+            self._mode._getMarkerCallBack(marker);
+        });
     }
     // 检测是否有小区点过了
     _checkPrevHaMarker () {
-        let self = this;
-        //是否有已点击的小区图标信息
-        if (self._haClickedMarker) {
-            self._haClickedMarker.setBackGround(self._clusterFillColor, 'unset');
-            self._haClickedMarker = null;
-        }
+        this._mode._checkPrevHaMarker();
     }
     //获取小区详情
     getHaDetail (ha) {
@@ -520,10 +359,7 @@ class coreMap {
         self._haParam['ha'] = _haCode;
         self._haParam['page'] = 1;
         self._getHaHouseData(data => {
-            self._haData[_haCode] = {
-                ha,
-                houseList: data,
-            }
+            self._haData[_haCode] = {ha, houseList: data}
             self._triggerHaCallBack(_haCode);
         });
     }
@@ -533,39 +369,27 @@ class coreMap {
         //获取下一页数据
         self._haParam['page'] += 1;
         self._getHaHouseData(data => {
-            self._haData[_haCode]['houseList']['items'].push.apply(self._haData[_haCode]['houseList']['items'], data.items);
+            self._haData[_haCode]['houseList']['items'].push(...data.items);
             self._triggerHaCallBack(_haCode);
         });
     }
     // 获取小区房源信息
     _getHaHouseData (callback) {
         let self = this;
-        if (self.haAjaxHandle) {
-            self._hideLoading();
-            self.haAjaxHandle.abort();
-            return;
-        }
-
-        self._showLoading();
-        self.haAjaxHandle = $.ajax({
-            url: self._setting.api.haHouseUrl,
-            data: self._haParam,
-            dataType: 'json',
-            success: function(data) {
-                self._hideLoading();
-                if (data.status == 200) {
-                    if (!data.data.totalSize) {
-                        self.toast("暂未获取到该小区相关房源信息，请稍后再试！");
-                        return false;
-                    }
-                    callback.call(self, data.data);
-                } else {
-                    self.toast(data.errmsg);
+        self._setting.vue.axios.get(self._setting.api.haHouseUrl, {
+            params: self._haParam,
+            CSFCLoading: true,
+            nolazyloading: true,
+            withCredentials: true,
+        }).then(({status, data}) => {
+            if (status == 200 && data.status == 200) {
+                if (!data.data.totalSize) {
+                    self.toast("暂未获取到该小区相关房源信息，请稍后再试！");
+                    return false;
                 }
-            },
-            complete: function() {
-                self._hideLoading();
-                self.haAjaxHandle = null;
+                callback.call(self, data.data);
+            } else {
+                self.toast(data.errmsg);
             }
         })
     }
@@ -573,43 +397,9 @@ class coreMap {
         if (!this._haData[haCode]) {
             return false;
         }
-        if (typeof this._setting.getHaCallBack == 'function') {
-            this._setting.getHaCallBack(this._haData[haCode]);
-            this._sigGetHaCallBack = true;
-            return true;
-        }
-    }
-    //获取 SVGIcon 圆形覆盖物
-    _getSVGIconOverlayCircle (diameter, color, text, latlng) {
-        let iconOptions = {
-            'background': color,
-            'width': `${diameter}px`,
-            'height': `${diameter}px`,
-        };
-        return new SVGIconOverlay(latlng, text, iconOptions);
-    }
-    // 获取复杂覆盖物文字
-    _getMarkerText (haName, cnt, price) {
-        if (this._setting.mode == 'trade') {
-            return `${haName} ${price}元/㎡ ${cnt}套`;
-        }
-
-        if (this._setting.mode == 'ha') {
-            return haName;
-        }
-
-        return '';
-    }
-    //获取 SVGIcon 多边形覆盖物
-    _getSVGIconOverlayPolygon (properties) {
-        let ha_name = properties.haName;
-        let house_num = properties.cnt ? parseInt(properties.cnt) : 0;
-        let price = this._setting.formatPrice(properties.price);
-        let text = this._getMarkerText(ha_name, house_num, price);
-        let _latlngArr = properties.gps.split(',');
-        // 必须 是 BMap.Point， 否则聚合时会聚合不到一起
-        let latlng = new BMap.Point(_latlngArr[1], _latlngArr[0]);
-        return new SVGIconOverlayPolygon(latlng, text, house_num, properties);
+        this._setting.vue.getHaHouse(this._haData[haCode]);
+        this._sigGetHaCallBack = true;
+        return true;
     }
     //暂时删除move 和 zoom 的监听事件
     _temporaryRemoveMapEventListener () {
@@ -634,6 +424,8 @@ class coreMap {
             }
             //如果有聚合，缩放只触发 聚合的缩放事件，这里不作处理
             if (self.isCommunityLevel() && self._cluster) {
+                //弃用聚合插件的zoomend事件，在这里实现
+                setTimeout(() => {self._cluster._redraw()}, 100);
                 return true;
             }
             self.renderAll();
@@ -641,25 +433,16 @@ class coreMap {
         this._map.addEventListener('zoomstart', self._zoomStartHandler);
         this._map.addEventListener('zoomend', self._zoomEndHandler);
     }
-
     //移动监听
     onMove () {
         let self = this;
-        self._moveStartHandler = function(){
+        self._moveStartHandler = () => {
             self._moveStartPoint = self._map.getCenter();
             self._triggerRemoveHaCallBack();
         };
-        self._moveEndHandler = function () {
+        self._moveEndHandler = () => {
             self._onChangeCenter();
-            // if (self._moveendTimeout) {
-            //     clearTimeout(self._moveendTimeout);
-            // }
-            //这里setTimeout是在 聚合执行完_redraw 事件后，再执行该方法
-            self._moveendTimeout = setTimeout(function(){
-                if (self._sigHaClick) {
-                    self._sigHaClick = false;
-                    return true;
-                }
+            setTimeout(() => {
                 if (self._sigZoomPan) {
                     self._sigZoomPan = false;
                     self.renderAll();
@@ -710,16 +493,13 @@ class coreMap {
     }
     _triggerRemoveHaCallBack () {
         //是否有删除小区回调方法，如果有，则调用该方法
-        if (typeof this._setting.removeHaCallBack == 'function' && this._sigGetHaCallBack) {
+        if (this._sigGetHaCallBack) {
             this._sigGetHaCallBack = false;
-            this._setting.removeHaCallBack();
+            this._setting.vue.removeHaHouse();
         }
     }
     _clearCovers () {
         this._triggerRemoveHaCallBack();
-        // if (this._centerMarker) {
-        //     this._map.removeOverlay(this._centerMarker);
-        // }
         //清除聚合
         if (this.isCommunityLevel() && this._cluster) return;
         //清除聚合
@@ -741,10 +521,7 @@ class coreMap {
     }
     //弹出信息
     toast (msg) {
-        if (!this._setting.toast) {
-            return;
-        }
-        this._setting.toast(msg);
+        this._setting.vue.$toast(msg);
     }
     //是否为小区层级
     isCommunityLevel () {
@@ -771,19 +548,7 @@ class coreMap {
         this._moveEndPoint = center;
         this._clusterParam.lat = center.lat;
         this._clusterParam.lng = center.lng;
-        this._clusterParam.gps = center.lng+','+center.lat;
-    }
-    //获取字符串长度
-    _getStrLen (str) {
-        let l = str.length;
-        let blen = 0;
-        for(let i = 0; i < l; i++) {
-            if ((str.charCodeAt(i) & 0xff00) != 0) {
-                blen ++;
-            }
-            blen ++;
-        }
-        return blen;
+        this._clusterParam.gps = `${center.lng},${center.lat}`;
     }
     //获取气泡半径
     _getBubbleSize (size_key, properties) {
@@ -803,7 +568,6 @@ class coreMap {
                     scope);
     }
     _get_scope_value (value, min, max, scope) {
-        let self = this;
         let step = (max - min) / scope.length;
         let start_value;
         let end_value;
@@ -819,21 +583,8 @@ class coreMap {
             }
         }
     }
-    //显示加载中
-    _showLoading () {
-        if (typeof this._setting.csfcLoading == 'function') {
-            this._setting.csfcLoading(true);
-        }
-    }
-    _hideLoading () {
-        if (typeof this._setting.csfcLoading == 'function') {
-            this._setting.csfcLoading(false);
-        }
-    }
     run () {
         this.onZoom();
         this.onMove();
     }
 }
-
-export {coreMap, MyGeoLocationControl, MyScaleControl};

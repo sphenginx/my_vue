@@ -80,18 +80,6 @@ var isArray = function (source) {
  */
 var indexOf = function (item, source) {
     var index = -1;
-    // if(isArray(source)){
-    //     if (source.indexOf) {
-    //         index = source.indexOf(item);
-    //     } else {
-    //         for (var i = 0, m; m = source[i]; i++) {
-    //             if (m === item) {
-    //                 index = i;
-    //                 break;
-    //             }
-    //         }
-    //     }
-    // }
     if (isArray(source)) {
         for (var i = 0, m; m = source[i]; i++) {
             //小区码一样就不加入到 markers 里面
@@ -143,10 +131,6 @@ class MarkerClusterer {
         this._markerCallBack = opts['markerCallBack'] || "";
         //核心类
         this._coreMap = opts['coreMap'] || "";
-        this._zoomEndHandler =  () => {
-            this._redraw();
-        }
-        this._map.addEventListener("zoomend", this._zoomEndHandler);
         var mkrs = opts["markers"];
         isArray(mkrs) && this.addMarkers(mkrs);
     }
@@ -230,6 +214,7 @@ class MarkerClusterer {
                 }
             }
         }
+
         if (clusterToAddTo && clusterToAddTo.isMarkerInClusterBounds(marker)) {
             clusterToAddTo.addMarker(marker);
         } else {
@@ -316,6 +301,7 @@ class MarkerClusterer {
             markers.splice(0, 1);
             success = success || r;
         }
+
         if (success) {
             this._clearLastClusters();
             this._createClusters();
@@ -490,6 +476,7 @@ class MarkerClusterer {
 
 // 百度地图聚合类
 class Cluster {
+
     /**
      * @ignore
      * Cluster

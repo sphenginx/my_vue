@@ -22,17 +22,19 @@
 
 //引入自定义覆盖物的css
 import "./ComplexCustomOverlay.css";
+
 //合并参数
-function extend(o, n, override = true) {
+function extend(o, n, override) {
     for (let key in n) {
-        if (!o.hasOwnProperty(key) || override) {
+        if (n.hasOwnProperty(key) && (!o.hasOwnProperty(key) || override)) {
             o[key] = n[key];
         }
     }
     return o;
 }
+
 // 圆形覆盖物
-class SVGIconOverlay extends BMap.Overlay {
+export class SVGIconOverlay extends BMap.Overlay {
     // 构造方法
     constructor(point, txt, opts) {
         super();
@@ -44,7 +46,7 @@ class SVGIconOverlay extends BMap.Overlay {
             'width': '62px',
             'height': '62px',
         }
-        this._styles = extend(def, opts);
+        this._styles = extend(def, opts, true);
     }
     initialize(map) {
         this._map = map;
@@ -85,10 +87,8 @@ class SVGIconOverlay extends BMap.Overlay {
     }
     _updatePosition() {
         if (this._div && this._point) {
-            if (this._styles) {
-                for (let _key in this._styles) {
-                    this._div.style[_key] = this._styles[_key];
-                }
+            for (let _key in this._styles) {
+                this._div.style[_key] = this._styles[_key];
             }
             let pixel = this._map.pointToOverlayPixel(this._point);
             this._div.style.left = pixel.x - this._cwidth / 2 + "px";
@@ -108,11 +108,9 @@ class SVGIconOverlay extends BMap.Overlay {
 
 
 // 多边形覆盖物， 继承自圆形覆盖物
-class SVGIconOverlayPolygon extends SVGIconOverlay {
+export class SVGIconOverlayPolygon extends SVGIconOverlay {
     constructor(point, txt, num, ha) {
-        super();
-        this._point = point;
-        this._text = txt;
+        super(point, txt);
         this._num = num;
         this._ha = ha;
         this._background = null;
@@ -151,12 +149,11 @@ class SVGIconOverlayPolygon extends SVGIconOverlay {
             // 设置 z-index
             this._div.style['z-index'] = this._zIndex;
             if (this._background) {
-                this._div.style['background'] = this._background;
-                iObj.style['border-color'] = `${this._background} transparent transparent transparent`;
+                this._div.style.background = this._background;
+                iObj.style.borderColor = `${this._background} transparent transparent transparent`;
             }
         }
     }
-    // 设置数字
     setNum(num) {
         if (num && (!this._num || (this._num != num))) {
             this._num = num;
@@ -169,5 +166,3 @@ class SVGIconOverlayPolygon extends SVGIconOverlay {
         return this._ha;
     }
 }
-
-export { SVGIconOverlay, SVGIconOverlayPolygon }

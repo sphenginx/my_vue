@@ -2,9 +2,8 @@ export default {
     async init () {
         const AK = "oprtGDXoTujaw5iQ1DMOfG5WxcAFwE8s";
         const apiVersion = "2.0";
-        const curProtocol = "https:" == document.location.protocol ? " https://" : " http://";
-        const BMap_URL = `${curProtocol}api.map.baidu.com/api?v=${apiVersion}&ak=${AK}&callback=onBMapCallback`;
-        await new Promise((resolve, reject) => {
+        const BMap_URL = `${location.protocol}//api.map.baidu.com/api?v=${apiVersion}&ak=${AK}&callback=onBMapCallback`;
+        await new Promise(resolve => {
             // 如果已加载直接返回
             if(typeof BMap !== "undefined") {
                 resolve();

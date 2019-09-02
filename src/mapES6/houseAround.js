@@ -29,7 +29,7 @@
 import EventWrapper from './EventWrapper.js';
 //引入自定义覆盖物的css
 import "./ComplexCustomOverlay.css";
-import ComplexCustomOverlay from './ComplexCustomOverlay.js';
+import {ComplexCustomOverlay} from './ComplexCustomOverlay.js';
 
 //合并参数
 function extend(o, n, override) {
@@ -41,7 +41,7 @@ function extend(o, n, override) {
     return o;
 }
 
-class HouseAround {
+export class HouseAround {
     constructor (opt) {
         this._map = null; //地图对象
         this._aroundList = {}; //周边小区信息
@@ -49,8 +49,6 @@ class HouseAround {
         this._currentTitle = null; //当前名称
         this._categoryComplexData = {}; // 复杂覆盖物类别
         this._centerPoint = null; //百度中心点
-        this._centerIcon = "";
-        this._categoryIcon = "";
         this.routes = []; //路线信息
         this._init(opt);
     }
@@ -69,7 +67,6 @@ class HouseAround {
             haName: "", //当前小区名
             defaultCategoryClick: "", //默认点击元素
             categoryComplexClick: "", //复杂覆盖物的点击事件
-            toast: "", //提示框
             gps: "", //gps
             coordType: "bd09ll", //坐标的类型:bd09ll（百度经纬度坐标）、gcj02（国测局经纬度坐标）、wgs84（ GPS经纬度）
             resultType: "", //返回结果的类型，每次只查询一种
@@ -112,34 +109,15 @@ class HouseAround {
         self._map.centerAndZoom(self._centerPoint, 16);
         self._map.enableScrollWheelZoom();
     }
-    //检测中心点icon
-    _checkCenterIcon () {
-        if (this._setting.centerIcon) {
-            const _img = this._setting.centerIcon;
-            this._centerIcon = new BMap.Icon(_img, new BMap.Size(38,46), {anchor: new BMap.Size(19, 46)});
-            return true;
-        } 
-        return false;
-    }
-    //检测类别icon
-    _checkCategoryIcon () {
-        if (this._setting.categoryIcon) {
-            const _img = this._setting.categoryIcon;
-            this._categoryIcon = new BMap.Icon(_img, new BMap.Size(38,46), {anchor: new BMap.Size(19, 46)});
-            return true;
+    getBmapMarker(point, type = 'categoryIcon') {
+        let marker = null;
+        if (this._setting[type]) {
+            const icon = new BMap.Icon(this._setting[type], new BMap.Size(30.8, 36.8), {anchor: new BMap.Size(15.4, 36.8)});
+            marker = new BMap.Marker(point, {icon});
+        } else {
+            marker = new BMap.Marker(point);
         }
-        return false;
-    }
-    //显示加载中
-    _showLoading () {
-        if (typeof this._setting.csfcLoading == 'function') {
-            this._setting.csfcLoading(true);
-        }
-    }
-    _hideLoading () {
-        if (typeof this._setting.csfcLoading == 'function') {
-            this._setting.csfcLoading(false);
-        }
+        return marker;
     }
     //加载中心点marker并设置中心坐标
     renderCenter () {
@@ -165,10 +143,7 @@ class HouseAround {
     _renderCenterMarker (point) {
         let self = this;
         let _point = point || self._centerPoint;
-        let _centerMarker = new BMap.Marker(_point);
-        if (self._checkCenterIcon()) {
-            _centerMarker = new BMap.Marker(_point, {icon: self._centerIcon});
-        }
+        let _centerMarker = self.getBmapMarker(_point, 'centerIcon');
         self._map.addOverlay(_centerMarker);
         //中心点marker是否需要增加点击事件
         if (self._setting.centerMarkerClick) {
@@ -188,22 +163,19 @@ class HouseAround {
             self._renderCategoryMapInfo(self._aroundList[self._currentCatory]);
         } else {
             self.ajaxParams.resultType = self._currentCatory;
-            self._showLoading();
-            $.ajax({
-                method: 'GET',
-                url: self._setting.api.infoUrl,
-                data: self.ajaxParams,
-                dataType: 'json',
-                success: function(json) {
-                    self._hideLoading();
-                    if (json.status == 200) {
-                        self._aroundList[self._currentCatory] = json.data.items;
-                        self._renderCategoryMapInfo(json.data.items);
-                    } else {
-                        self._setting.toast('系统异常，请稍后再试！');
-                    }
+            self._setting.vue.axios.get(self._setting.api.infoUrl, {
+                params: self.ajaxParams,
+                CSFCLoading: true,
+                nolazyloading: true,
+                withCredentials:true,
+            }).then(({status, data}) => {
+                if (status == 200 && data.status == 200) {
+                    self._aroundList[self._currentCatory] = data.data.items;
+                    self._renderCategoryMapInfo(data.data.items);
+                } else {
+                    self._setting.vue.$toast('系统异常，请稍后再试！');
                 }
-            });
+            })
         }
     }
     //渲染周边的地图信息
@@ -216,8 +188,8 @@ class HouseAround {
                 if (self._isCurrentHa(data[i]['code'])) {
                     continue;
                 }
-                let _gpsArr = data[i]['gps'].split(',');
-                let wPoint = new BMap.Point(_gpsArr[0], _gpsArr[1]);
+                let [lng, lat] = data[i]['gps'].split(',');
+                let wPoint = new BMap.Point(lng, lat);
                 pointArr.push(wPoint);
             }
             convertor.translate(pointArr, self._setting.currentGps, self._setting.translateGps, self._categoryCallBack);
@@ -226,8 +198,8 @@ class HouseAround {
                 if (self._isCurrentHa(data[i]['code'])) {
                     continue;
                 }
-                let _gpsArr = data[i]['gps'].split(',');
-                let _wPoint = new BMap.Point(_gpsArr[0], _gpsArr[1]);
+                let [lng, lat] = data[i]['gps'].split(',');
+                let _wPoint = new BMap.Point(lng, lat);
                 self._renderCategoryMarker(_wPoint, i);
             }
         }
@@ -254,19 +226,15 @@ class HouseAround {
             self._renderCategoryComplexOverlay(self._categoryComplexData);
             return;
         }
-        //是否有自定义图标
-        let _categoryMarker = new BMap.Marker(point);
-        if (self._checkCategoryIcon()) {
-            _categoryMarker = new BMap.Marker(point, {icon: self._categoryIcon});
-        }
+        let _categoryMarker = self.getBmapMarker(point);
         self._map.addOverlay(_categoryMarker);
         self.addClickHandler(_currentData, _categoryMarker);
     }
     //渲染类别复杂覆盖物信息
     _renderCategoryComplexOverlay (data) {
         let self = this;
-        let _gpsArr = data['gps'].split(',');
-        let _point = new BMap.Point(_gpsArr[0], _gpsArr[1]);
+        let [lng, lat] = data['gps'].split(',');
+        let _point = new BMap.Point(lng, lat);
         let _opt = {
             '_point': _point,
             '_text': data.name,
@@ -381,26 +349,23 @@ class HouseAround {
             self._renderTrafficMapInfo(self._aroundList['traffic']);
         } else {
             self.ajaxParams.resultType = 'traffic';
-            self._showLoading();
-            $.ajax({
-                method: 'GET',
-                url: self._setting.api.trafficUrl,
-                data: self.ajaxParams,
-                dataType: 'json',
-                success: function(json) {
-                    self._hideLoading();
-                    if (json.status == 200) {
-                        if (!json.data.items.length) {
-                            self._setting.toast('暂无周边公交数据！');
-                            return;
-                        }
-                        self._aroundList['traffic'] = json.data.items;
-                        self._renderTrafficMapInfo(json.data.items);
-                    } else {
-                        self._setting.toast('系统异常，请稍后再试！');
+            self._setting.vue.axios.get(self._setting.api.trafficUrl, {
+                params: self.ajaxParams,
+                CSFCLoading: true,
+                nolazyloading: true,
+                withCredentials:true,
+            }).then(({status, data}) => {
+                if (status == 200 && data.status == 200) {
+                    if (!data.data.items.length) {
+                        self._setting.vue.$toast('暂无周边公交数据！');
+                        return;
                     }
+                    self._aroundList['traffic'] = data.data.items;
+                    self._renderTrafficMapInfo(data.data.items);
+                } else {
+                    self._setting.vue.$toast('系统异常，请稍后再试！');
                 }
-            });
+            })
         }
     }
     _renderTrafficMapInfo (traffic) {
@@ -408,8 +373,8 @@ class HouseAround {
         //清空路线信息
         self.routes = [];
         for (let i in traffic) {
-            let _gpsArr = traffic[i]['bd09GPS'].split(',');
-            let _tPoint = new BMap.Point(_gpsArr[0], _gpsArr[1]);
+            let [lng, lat] = traffic[i]['bd09GPS'].split(',');
+            let _tPoint = new BMap.Point(lng, lat);
             let _opt = {
                 '_point': _tPoint,
                 '_text': traffic[i].name,
@@ -461,6 +426,3 @@ class HouseAround {
         });
     }
 }
-
-//最后将插件对象暴露给全局对象
-export default HouseAround;
