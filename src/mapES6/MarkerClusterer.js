@@ -316,8 +316,6 @@ class MarkerClusterer {
     clearMarkers() {
         this._clearLastClusters();
         this._removeMarkersFromMap();
-        //删除监听事件
-        this._map.removeEventListener('zoomend', this._zoomEndHandler);
         this._markers = [];
     }
 

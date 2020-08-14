@@ -464,8 +464,7 @@ export class coreMap {
                 if (self._needLoadMoreHa()) {
                     //清除聚合
                     if (self._cluster) {
-                        self._cluster._clearLastClusters();
-                        // self._cluster = null;
+                        self._cluster.clearMarkers();
                     }
                     self.renderAll();
                 } else if (self._cluster) {
